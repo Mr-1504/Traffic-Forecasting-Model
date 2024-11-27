@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
   <component name="ChangeListManager">
     <list default="true" id="33ffb4d1-c94e-475b-9977-4690f6465ba9" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -22,9 +25,16 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "master"
+    "git-widget-placeholder": "master",
+    "ignore.virus.scanning.warn.message": "true",
+    "last_opened_file_path": "D:/Code/Traffic-Forecasting-Model"
   }
 }]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\Code\Traffic-Forecasting-Model" />
+    </key>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
