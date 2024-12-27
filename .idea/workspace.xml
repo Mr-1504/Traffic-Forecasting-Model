@@ -4,18 +4,46 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="33ffb4d1-c94e-475b-9977-4690f6465ba9" name="Changes" comment="" />
+    <list default="true" id="33ffb4d1-c94e-475b-9977-4690f6465ba9" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/csv-editor.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/temp.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/Traffic-Forecasting-Model.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Traffic-Forecasting-Model.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/res/GRU.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/res/LSTM.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/res/MLP.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/res/RCNN.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/res/RNN.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/res/SVR.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/res/decisionTree.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/res/rnn_traffic_model.h5" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/res/rnn_traffic_model.keras" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/GAN.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/GAN.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/GRU.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/GRU.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/LSTM.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/LSTM.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/MLP.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/MLP.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/RCNN.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/RCNN.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/RNN.png" beforeDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 5
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 5
+}</component>
   <component name="ProjectId" id="2pR0MrwQhZq6Z6NNnwPg3wBvqfx" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
@@ -24,7 +52,14 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "Python.GAN.executor": "Run",
+    "Python.GRU.executor": "Run",
+    "Python.MLP.executor": "Run",
+    "Python.Plot.executor": "Run",
+    "Python.RNN.executor": "Run",
+    "Python.temp.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "git-widget-placeholder": "master",
     "ignore.virus.scanning.warn.message": "true",
     "last_opened_file_path": "D:/Code/Traffic-Forecasting-Model"

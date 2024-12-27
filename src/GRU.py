@@ -1,4 +1,7 @@
 # GRU
+import json
+import os
+
 import pandas as pd
 import numpy as np
 from keras.src.layers import GRU
@@ -7,17 +10,71 @@ from sklearn.metrics import mean_squared_error, r2_score
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import SimpleRNN, Dense
 import matplotlib.pyplot as plt
+from tensorflow.python.keras.callbacks import Callback
 
-file_path = 'D:/Code/Vigilant-VGG16/Traffic/resource/train27303.csv'
-time_step = 24
+file_path = '../resource/train27303.csv'
+metrics_path = '../res/GRU/gru_metrics.json'
+time_step = 12
 train_epoch = 100
-batch_size = 32
+batch_size = 64
 training_rate = 0.8
 
-def plot(test_data, y_test, test_predict):
-    mse = mean_squared_error(y_test, test_predict)
+class CustomSaveCallback(Callback):
+    def __init__(self, x_test, y_test, scaler, best_r2):
+        super().__init__()
+        self.x_test = x_test
+        self.y_test = y_test
+        self.scaler = scaler
+        self.best_r2 = best_r2
+        self.best_predictions = None
+
+    def on_epoch_end(self, epoch, logs=None):
+        predictions = self.model.predict(self.x_test)
+        predictions = self.scaler.inverse_transform(predictions)
+        y_true = self.scaler.inverse_transform(self.y_test.reshape(-1, 1))
+
+        r2 = r2_score(y_true, predictions)
+
+        if r2 > self.best_r2:
+            self.best_r2 = r2
+            self.best_predictions = predictions
+            model_path = f'../res/GRU/gru_model.h5'
+            self.model.save(model_path)
+
+            metrics_data = {
+                "epoch": epoch + 1,
+                "r2_score": r2,
+                "mse": mean_squared_error(y_true, predictions),
+                "rmse": np.sqrt(mean_squared_error(y_true, predictions))
+            }
+            with open(metrics_path, 'w') as f:
+                json.dump(metrics_data, f, indent=4)
+
+            print(f'\n[Mô hình đã lưu], R²: {r2:.4f}, File: {model_path}')
+
+
+def load_best_metrics():
+    if os.path.exists(metrics_path):
+        with open(metrics_path, 'r') as f:
+            metrics = json.load(f)
+        print(f"[Load model seccussfully]")
+        print(f"Epoch: {metrics['epoch']}")
+        print(f"R²: {metrics['r2_score']:.4f}")
+        print(f"MSE: {metrics['mse']:.2f}")
+        print(f"RMSE: {metrics['rmse']:.2f}")
+        return metrics
+    else:
+        print("[Not found model]")
+        return None
+
+
+def plot(test_data, y_test, best_predictions):
+    if best_predictions is None:
+        print('No model to plot')
+        return
+    mse = mean_squared_error(y_test, best_predictions)
     rmse = np.sqrt(mse)
-    r2 = r2_score(y_test, test_predict)
+    r2 = r2_score(y_test, best_predictions)
 
     print(f'MSE: {mse}')
     print(f'RMSE: {rmse}')
@@ -29,12 +86,12 @@ def plot(test_data, y_test, test_predict):
         test_data = test_data.iloc[:len(y_test)]
 
     plt.plot(test_data['timestamp'], y_test, label='Real Traffic Count', color='red')
-    plt.plot(test_data['timestamp'], test_predict, label='Predicted Traffic Count', color='blue')
+    plt.plot(test_data['timestamp'], best_predictions, label='Predicted Traffic Count', color='blue')
     plt.xlabel('Time')
     plt.ylabel('Traffic Count')
     plt.title('Traffic Prediction')
     plt.legend()
-    plt.savefig('../res/GRU.png')
+    plt.savefig('../res/gru/gru.png')
     plt.close()
 
 def read_data():
@@ -76,14 +133,19 @@ def train():
     model.add(Dense(1))
     model.compile(optimizer='adam', loss='mean_squared_error')
 
-    model.fit(x_train, y_train, epochs=train_epoch, batch_size=batch_size, verbose=1)
+    best_metrics = load_best_metrics()
+    save_callback = CustomSaveCallback(x_test, y_test, scaler, best_metrics['r2_score'] if best_metrics else -np.inf)
+    model.fit(
+        x_train,
+        y_train,
+        epochs=train_epoch,
+        batch_size=batch_size,
+        verbose=1,
+        callbacks=save_callback
+    )
 
-    test_predict = model.predict(x_test)
-
-    test_predict = scaler.inverse_transform(test_predict)
-    y_test = scaler.inverse_transform(y_test.reshape(-1, 1))
-
-    return test_data, y_test, test_predict
+    return test_data, save_callback.scaler.inverse_transform(
+        save_callback.y_test.reshape(-1, 1)), save_callback.best_predictions
 
 if __name__ == '__main__':
     test_data, y_test, test_predict = train()

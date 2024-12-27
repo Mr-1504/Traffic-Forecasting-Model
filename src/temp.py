@@ -12,7 +12,7 @@ from tensorflow.python.keras.callbacks import Callback
 
 file_path = '../resource/train27303.csv'
 metrics_path = '../res/MLP/mlp_metrics.json'
-time_step = 12
+time_step = 24
 train_epoch = 200
 batch_size = 64
 
@@ -66,9 +66,6 @@ def load_best_metrics():
 
 
 def plot(test_data, y_test, best_predictions):
-    if best_predictions is None:
-        print('No model to plot')
-        return
     mse = mean_squared_error(y_test, best_predictions)
     rmse = np.sqrt(mse)
     r2 = r2_score(y_test, best_predictions)
