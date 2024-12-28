@@ -17,6 +17,7 @@ time_step = 24
 train_epoch = 100
 batch_size = 32
 
+
 class CustomSaveCallback(Callback):
     def __init__(self, x_test, y_test, scaler, best_r2):
         super().__init__()
@@ -92,6 +93,7 @@ def plot(test_data, y_test, best_predictions):
     plt.savefig('../res/RCNN/rcnn.png')
     plt.close()
 
+
 def read_data():
     data = pd.read_csv(file_path)
     data['timestamp'] = pd.to_datetime(data['timestamp'])
@@ -109,6 +111,7 @@ def read_data():
 
     return test_data, train_scaled, test_scaled, scaler
 
+
 def create_dataset(dataset, time_step=1):
     X, y = [], []
     for i in range(len(dataset) - time_step - 1):
@@ -116,6 +119,7 @@ def create_dataset(dataset, time_step=1):
         X.append(a)
         y.append(dataset[i + time_step, 0])
     return np.array(X), np.array(y)
+
 
 def train():
     test_data, train_scaled, test_scaled, scaler = read_data()
@@ -133,7 +137,8 @@ def train():
     model.add(Dense(1))
     model.compile(optimizer='adam', loss='mean_squared_error')
 
-    save_callback = CustomSaveCallback(x_test, y_test, scaler)
+    best_metrics = load_best_metrics()
+    save_callback = CustomSaveCallback(x_test, y_test, scaler, best_metrics['r2_score'] if best_metrics else -np.inf)
     model.fit(
         x_train,
         y_train,
@@ -143,7 +148,9 @@ def train():
         callbacks=save_callback
     )
 
-    return test_data, y_test, save_callback.best_predictions
+    return test_data, save_callback.scaler.inverse_transform(
+        save_callback.y_test.reshape(-1, 1)), save_callback.best_predictions
+
 
 if __name__ == '__main__':
     test_data, y_test, best_predictions = train()
