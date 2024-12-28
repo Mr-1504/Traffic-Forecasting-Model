@@ -12,7 +12,7 @@ from tensorflow.python.keras.callbacks import Callback
 
 file_path = '../resource/train27303.csv'
 metrics_path = '../res/MLP/mlp_metrics.json'
-time_step = 12
+time_step = 24
 train_epoch = 200
 batch_size = 64
 
@@ -123,7 +123,7 @@ def train():
     x_test, y_test = create_dataset(test_scaled, time_step)
 
     x_train = x_train.reshape(x_train.shape[0], x_train.shape[1])
-    X_test = x_test.reshape(x_test.shape[0], x_test.shape[1])
+    x_test = x_test.reshape(x_test.shape[0], x_test.shape[1])
 
     model = Sequential()
     model.add(Dense(128, activation='tanh', input_shape=(time_step,)))
