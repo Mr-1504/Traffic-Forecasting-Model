@@ -73,8 +73,7 @@ Traffic-Forecasting-Model/
 We welcome contributions from the community. Please create a new branch, make your changes, and submit a pull request.
 
 ## License
-
-This project is licensed under the MIT License.
+This project is licensed under the [MIT License](LICENSE). 
 
 ## Contact
 
