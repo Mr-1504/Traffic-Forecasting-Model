@@ -1,21 +1,22 @@
-import json
-import os
-
-import pandas as pd
-import numpy as np
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Dense, LSTM, Flatten, concatenate
+from tensorflow.keras.callbacks import Callback
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error, r2_score
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
+import numpy as np
+import pandas as pd
+import os
+import json
 import matplotlib.pyplot as plt
-from tensorflow.python.keras.callbacks import Callback
 
+# Đường dẫn tệp
 file_path = '../resource/train27303.csv'
-metrics_path = '../res/MLP/mlp_metrics.json'
-time_step = 24
+metrics_path = '../res/MLP_LSTM/combined_metrics.json'
+time_step = 12
 train_epoch = 200
 batch_size = 64
 
+# Callback để lưu mô hình tốt nhất
 class CustomSaveCallback(Callback):
     def __init__(self, x_test, y_test, scaler, best_r2):
         super().__init__()
@@ -31,11 +32,10 @@ class CustomSaveCallback(Callback):
         y_true = self.scaler.inverse_transform(self.y_test.reshape(-1, 1))
 
         r2 = r2_score(y_true, predictions)
-
         if r2 > self.best_r2:
             self.best_r2 = r2
             self.best_predictions = predictions
-            model_path = f'../res/MLP/mlp_model.h5'
+            model_path = f'../res/MLP_LSTM/combined_model.h5'
             self.model.save(model_path)
 
             metrics_data = {
@@ -47,48 +47,9 @@ class CustomSaveCallback(Callback):
             with open(metrics_path, 'w') as f:
                 json.dump(metrics_data, f, indent=4)
 
-            print(f'\n[Mô hình đã lưu], R²: {r2:.4f}, File: {model_path}')
+            print(f'\n[Model Saved], R²: {r2:.4f}, File: {model_path}')
 
-
-def load_best_metrics():
-    if os.path.exists(metrics_path):
-        with open(metrics_path, 'r') as f:
-            metrics = json.load(f)
-        print(f"[Load model seccussfully]")
-        print(f"Epoch: {metrics['epoch']}")
-        print(f"R²: {metrics['r2_score']:.4f}")
-        print(f"MSE: {metrics['mse']:.2f}")
-        print(f"RMSE: {metrics['rmse']:.2f}")
-        return metrics
-    else:
-        print("[Not found model]")
-        return None
-
-
-def plot(test_data, y_test, best_predictions):
-    mse = mean_squared_error(y_test, best_predictions)
-    rmse = np.sqrt(mse)
-    r2 = r2_score(y_test, best_predictions)
-
-    print(f'MSE: {mse}')
-    print(f'RMSE: {rmse}')
-    print(f'R²: {r2}')
-
-    plt.figure(figsize=(20, 10))
-
-    if len(test_data['timestamp']) > len(y_test):
-        test_data = test_data.iloc[:len(y_test)]
-
-    plt.plot(test_data['timestamp'], y_test, label='Real Traffic Count', color='red')
-    plt.plot(test_data['timestamp'], best_predictions, label='Predicted Traffic Count', color='blue')
-    plt.xlabel('Time')
-    plt.ylabel('Traffic Count')
-    plt.title('Traffic Prediction')
-    plt.legend()
-    plt.savefig('../res/MLP/MLP.png')
-    plt.close()
-
-
+# Đọc và xử lý dữ liệu
 def read_data():
     data = pd.read_csv(file_path)
     data['timestamp'] = pd.to_datetime(data['timestamp'])
@@ -106,6 +67,7 @@ def read_data():
 
     return test_data, train_scaled, test_scaled, scaler
 
+# Tạo tập dữ liệu với time_step
 def create_dataset(dataset, time_step=1):
     X, y = [], []
     for i in range(len(dataset) - time_step - 1):
@@ -114,41 +76,71 @@ def create_dataset(dataset, time_step=1):
         y.append(dataset[i + time_step, 0])
     return np.array(X), np.array(y)
 
+# Xây dựng mô hình kết hợp
+def create_combined_model(time_step):
+    # LSTM branch
+    lstm_input = Input(shape=(time_step, 1))
+    lstm_branch = LSTM(50, return_sequences=True)(lstm_input)
+    lstm_branch = LSTM(50)(lstm_branch)
+
+    # MLP branch
+    mlp_input = Input(shape=(time_step,))
+    mlp_branch = Dense(128, activation='tanh')(mlp_input)
+    mlp_branch = Dense(64, activation='tanh')(mlp_branch)
+
+    # Combine branches
+    combined = concatenate([lstm_branch, mlp_branch])
+    combined = Dense(32, activation='relu')(combined)
+    output = Dense(1)(combined)
+
+    model = Model(inputs=[lstm_input, mlp_input], outputs=output)
+    model.compile(optimizer='adam', loss='mean_squared_error')
+    return model
+
+# Huấn luyện mô hình
 def train():
     test_data, train_scaled, test_scaled, scaler = read_data()
-    x_train, y_train = create_dataset(train_scaled, time_step)
-    x_test, y_test = create_dataset(test_scaled, time_step)
+    x_train_lstm, y_train = create_dataset(train_scaled, time_step)
+    x_test_lstm, y_test = create_dataset(test_scaled, time_step)
 
-    x_train = x_train.reshape(x_train.shape[0], x_train.shape[1])
-    X_test = x_test.reshape(x_test.shape[0], x_test.shape[1])
+    x_train_mlp = x_train_lstm.reshape(x_train_lstm.shape[0], x_train_lstm.shape[1])
+    x_test_mlp = x_test_lstm.reshape(x_test_lstm.shape[0], x_test_lstm.shape[1])
 
-    model = Sequential()
-    model.add(Dense(128, activation='tanh', input_shape=(time_step,)))
-    model.add(BatchNormalization())
-    model.add(Dropout(0.2))
+    x_train_lstm = x_train_lstm.reshape(x_train_lstm.shape[0], x_train_lstm.shape[1], 1)
+    x_test_lstm = x_test_lstm.reshape(x_test_lstm.shape[0], x_test_lstm.shape[1], 1)
 
-    model.add(Dense(64, activation='tanh'))
-    model.add(BatchNormalization())
-    model.add(Dropout(0.2))
+    model = create_combined_model(time_step)
+    best_metrics = None
+    if os.path.exists(metrics_path):
+        with open(metrics_path, 'r') as f:
+            best_metrics = json.load(f)
+    save_callback = CustomSaveCallback([x_test_lstm, x_test_mlp], y_test, scaler,
+                                        best_metrics['r2_score'] if best_metrics else -np.inf)
 
-    model.add(Dense(32, activation='tanh'))
-    model.add(Dense(1))
-
-    model.compile(optimizer='adam', loss='mean_squared_error')
-
-    best_metrics = load_best_metrics()
-    save_callback = CustomSaveCallback(x_test, y_test, scaler, best_metrics['r2_score'] if best_metrics else -np.inf)
     model.fit(
-        x_train,
+        [x_train_lstm, x_train_mlp],
         y_train,
         epochs=train_epoch,
         batch_size=batch_size,
         verbose=1,
-        callbacks=save_callback
+        callbacks=[save_callback]
     )
+    return test_data, scaler.inverse_transform(y_test.reshape(-1, 1)), save_callback.best_predictions
 
-    return test_data, save_callback.scaler.inverse_transform(
-        save_callback.y_test.reshape(-1, 1)), save_callback.best_predictions
+# Plot kết quả
+def plot(test_data, y_test, best_predictions):
+    if best_predictions is None:
+        print('No predictions to plot')
+        return
+    plt.figure(figsize=(20, 10))
+    plt.plot(test_data['timestamp'], y_test, label='Real Traffic Count', color='red')
+    plt.plot(test_data['timestamp'], best_predictions, label='Predicted Traffic Count', color='blue')
+    plt.xlabel('Time')
+    plt.ylabel('Traffic Count')
+    plt.title('MLP_LSTM Model Prediction')
+    plt.legend()
+    plt.savefig('../res/MLP_LSTM/mpl_lstm.png')
+    plt.close()
 
 if __name__ == '__main__':
     test_data, y_test, test_predict = train()
