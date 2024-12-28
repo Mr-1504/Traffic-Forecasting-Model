@@ -8,7 +8,7 @@ from keras.src.layers import GRU
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error, r2_score
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import SimpleRNN, Dense
+from tensorflow.keras.layers import Dense
 import matplotlib.pyplot as plt
 from tensorflow.python.keras.callbacks import Callback
 
