@@ -7,10 +7,13 @@ from keras.src.layers import BatchNormalization
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error, r2_score
 from tensorflow.keras.models import Sequential, Model
-from tensorflow.keras.layers import Dense, LeakyReLU, Dropout, Input
+from tensorflow.keras.layers import Dense, LeakyReLU, Dropout, Input, Flatten
 from tensorflow.keras.optimizers import Adam
 import matplotlib.pyplot as plt
 from tensorflow.python.keras.callbacks import Callback
+from keras.optimizers.legacy import Adam
+
+optimizer = Adam(learning_rate=0.0002, beta_1=0.5)
 
 file_path = '../resource/train27303.csv'
 metrics_path = '../res/GAN/gan_metrics.json'
@@ -34,9 +37,18 @@ class CustomSaveCallback(Callback):
         noise = np.random.normal(0, 1, (len(self.y_test), latent_dim))
         test_predict = self.generator.predict(noise)
 
-        if test_predict.shape[1] != time_step:
-            test_predict = test_predict.reshape(-1, time_step)
-        predictions = self.model.predict(test_predict)
+        print("Shape of test_predict before reshaping:", test_predict.shape)  # In ra kích thước ban đầu
+
+        # Kiểm tra số phần tử và điều chỉnh kích thước nếu cần
+        if test_predict.shape[0] % time_step != 0:
+            # Cắt bớt phần tử dư thừa sao cho số phần tử chia hết cho time_step
+            test_predict = test_predict[:-(test_predict.shape[0] % time_step)]
+
+        test_predict = test_predict.reshape(-1, time_step)
+
+        print("Shape of test_predict after reshaping:", test_predict.shape)  # In ra kích thước sau khi reshape
+
+        predictions = self.generator.predict(test_predict)  # Sử dụng generator để dự đoán
         predictions = self.scaler.inverse_transform(predictions)
         y_true = self.scaler.inverse_transform(self.y_test.reshape(-1, 1))
 
@@ -46,7 +58,7 @@ class CustomSaveCallback(Callback):
             self.best_r2 = r2
             self.best_predictions = predictions
             model_path = f'../res/GAN/gan_model.h5'
-            self.model.save(model_path)
+            self.generator.save(model_path)  # Lưu generator thay vì self.model
 
             metrics_data = {
                 "epoch": epoch + 1,
@@ -140,13 +152,15 @@ def build_generator():
     model.add(Dense(1024))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
-    model.add(Dense(784, activation='sigmoid'))
+    model.add(Dense(time_step, activation='sigmoid'))  # Đầu ra có kích thước (time_step,)
     return model
 
 
 def build_discriminator():
     model = Sequential()
-    model.add(Dense(512, input_dim=784))
+    model.add(Input(shape=(time_step, 1)))
+    model.add(Flatten())
+    model.add(Dense(512))
     model.add(LeakyReLU(alpha=0.2))
     model.add(Dropout(0.3))
     model.add(Dense(256))
@@ -164,8 +178,6 @@ def train_gan():
     generator = build_generator()
     discriminator = build_discriminator()
 
-    optimizer = Adam(learning_rate=0.0001)
-
     discriminator.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=['accuracy'])
 
     discriminator.trainable = False
@@ -177,13 +189,13 @@ def train_gan():
 
     best_metrics = load_best_metrics()
     save_callback = CustomSaveCallback(x_test, y_test, scaler, best_metrics['r2_score'] if best_metrics else -np.inf,
-                                       generator)
+                                       gan)  # Chuyển gan vào callback
 
     for epoch in range(train_epoch):
         noise = np.random.normal(0, 1, (batch_size, latent_dim))
         fake_traffic = generator.predict(noise)
 
-        real_traffic = x_train[np.random.randint(0, x_train.shape[0], batch_size)]
+        real_traffic = x_train[np.random.randint(0, x_train.shape[0], batch_size)].reshape(batch_size, time_step, 1)
         real_labels = np.ones((batch_size, 1))
         fake_labels = np.zeros((batch_size, 1))
 
@@ -202,6 +214,7 @@ def train_gan():
 
     return test_data, save_callback.scaler.inverse_transform(
         save_callback.y_test.reshape(-1, 1)), save_callback.best_predictions
+
 
 
 if __name__ == '__main__':
