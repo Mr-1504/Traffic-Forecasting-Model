@@ -1,4 +1,3 @@
-# RCNN
 import json
 import os
 
@@ -7,14 +6,14 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error, r2_score
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Conv1D, MaxPooling1D, LSTM, Dense, Flatten
+from tensorflow.keras.layers import Conv1D, MaxPooling1D, LSTM, Dense, Flatten, Reshape
 import matplotlib.pyplot as plt
 from tensorflow.python.keras.callbacks import Callback
 
 file_path = '../resource/train27303.csv'
 metrics_path = '../res/RCNN/rcnn_metrics.json'
-time_step = 24
-train_epoch = 100
+time_step = 64
+train_epoch = 200
 batch_size = 32
 
 
@@ -29,14 +28,17 @@ class CustomSaveCallback(Callback):
 
     def on_epoch_end(self, epoch, logs=None):
         predictions = self.model.predict(self.x_test)
+        predictions = predictions.reshape(-1, 1)
         predictions = self.scaler.inverse_transform(predictions)
+
         y_true = self.scaler.inverse_transform(self.y_test.reshape(-1, 1))
+        predictions = predictions.flatten()
 
         r2 = r2_score(y_true, predictions)
 
         if r2 > self.best_r2:
             self.best_r2 = r2
-            self.best_predictions = predictions
+            self.best_predictions = predictions.copy()
             model_path = f'../res/RCNN/rcnn_model.h5'
             self.model.save(model_path)
 
@@ -130,10 +132,17 @@ def train():
     x_test = x_test.reshape(x_test.shape[0], x_test.shape[1], 1)
 
     model = Sequential()
-    model.add(Conv1D(filters=64, kernel_size=2, activation='relu', input_shape=(time_step, 1)))
+    model.add(Conv1D(filters=32, kernel_size=2, activation='relu', input_shape=(time_step, 1)))
     model.add(MaxPooling1D(pool_size=2))
-    model.add(LSTM(50, return_sequences=True))
-    model.add(LSTM(50, return_sequences=False))
+    model.add(Conv1D(filters=64, kernel_size=2, activation='relu'))
+    model.add(MaxPooling1D(pool_size=2))
+    model.add(Conv1D(filters=128, kernel_size=2, activation='relu'))
+    model.add(MaxPooling1D(pool_size=2))
+    model.add(Conv1D(filters=512, kernel_size=2, activation='relu'))
+    model.add(MaxPooling1D(pool_size=2))
+
+    model.add(LSTM(512, return_sequences=True, dropout=0.2, recurrent_dropout=0.2))
+    model.add(LSTM(512, return_sequences=False, dropout=0.2, recurrent_dropout=0.2))
     model.add(Dense(1))
     model.compile(optimizer='adam', loss='mean_squared_error')
 
