@@ -152,7 +152,7 @@ def build_generator():
     model.add(Dense(1024))
     model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
-    model.add(Dense(time_step, activation='sigmoid'))  # Đầu ra có kích thước (time_step,)
+    model.add(Dense(time_step, activation='sigmoid'))
     return model
 
 
