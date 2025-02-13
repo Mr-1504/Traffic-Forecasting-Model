@@ -1,222 +1,136 @@
-import json
-import os
+import argparse
 
-import pandas as pd
+import joblib
 import numpy as np
-from keras.src.layers import BatchNormalization
-from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import mean_squared_error, r2_score
+import tf
 from tensorflow.keras.models import Sequential, Model
-from tensorflow.keras.layers import Dense, LeakyReLU, Dropout, Input, Flatten
+from tensorflow.keras.layers import Dense, Dropout, BatchNormalization, LeakyReLU, Input, Flatten, Reshape
 from tensorflow.keras.optimizers import Adam
+from src.model_utils import read_data, create_dataset, plot_results
 import matplotlib.pyplot as plt
-from tensorflow.python.keras.callbacks import Callback
-from keras.optimizers.legacy import Adam
 
-optimizer = Adam(learning_rate=0.0002, beta_1=0.5)
+def build_generator(latent_dim, time_step):
+    model = Sequential([
+        Dense(256, input_dim=latent_dim),
+        BatchNormalization(),
+        LeakyReLU(alpha=0.2),
+        Dense(512),
+        BatchNormalization(),
+        LeakyReLU(alpha=0.2),
+        Dense(1024),
+        BatchNormalization(),
+        LeakyReLU(alpha=0.2),
+        Dense(time_step, activation='sigmoid'),
+        Reshape((time_step, 1))
+    ])
+    return model
 
-file_path = '../resource/train27303.csv'
-metrics_path = '../res/GAN/gan_metrics.json'
-time_step = 24
-train_epoch = 100
-batch_size = 32
-latent_dim = 100
+def build_discriminator(time_step):
+    model = Sequential([
+        Input(shape=(time_step, 1)),
+        Flatten(),
+        Dense(512),
+        LeakyReLU(alpha=0.2),
+        Dropout(0.3),
+        Dense(256),
+        LeakyReLU(alpha=0.2),
+        Dropout(0.3),
+        Dense(1, activation='sigmoid')
+    ])
+    return model
 
+def plot_results(d_losses, g_losses, args):
+    plt.figure(figsize=(10, 5))
 
-class CustomSaveCallback(Callback):
-    def __init__(self, x_test, y_test, scaler, best_r2, generator):
-        super().__init__()
-        self.x_test = x_test
-        self.y_test = y_test
-        self.scaler = scaler
-        self.best_r2 = best_r2
-        self.best_predictions = None
-        self.generator = generator
+    # Plot Discriminator Loss
+    plt.plot([d[0] for d in d_losses], label="Discriminator Loss")
 
-    def on_epoch_end(self, epoch, logs=None):
-        noise = np.random.normal(0, 1, (len(self.y_test), latent_dim))
-        test_predict = self.generator.predict(noise)
+    # Plot Generator Loss
+    plt.plot(g_losses, label="Generator Loss")
 
-        print("Shape of test_predict before reshaping:", test_predict.shape)  # In ra kích thước ban đầu
-
-        # Kiểm tra số phần tử và điều chỉnh kích thước nếu cần
-        if test_predict.shape[0] % time_step != 0:
-            # Cắt bớt phần tử dư thừa sao cho số phần tử chia hết cho time_step
-            test_predict = test_predict[:-(test_predict.shape[0] % time_step)]
-
-        test_predict = test_predict.reshape(-1, time_step)
-
-        print("Shape of test_predict after reshaping:", test_predict.shape)  # In ra kích thước sau khi reshape
-
-        predictions = self.generator.predict(test_predict)  # Sử dụng generator để dự đoán
-        predictions = self.scaler.inverse_transform(predictions)
-        y_true = self.scaler.inverse_transform(self.y_test.reshape(-1, 1))
-
-        r2 = r2_score(y_true, predictions)
-
-        if r2 > self.best_r2:
-            self.best_r2 = r2
-            self.best_predictions = predictions
-            model_path = f'../res/GAN/gan_model.h5'
-            self.generator.save(model_path)  # Lưu generator thay vì self.model
-
-            metrics_data = {
-                "epoch": epoch + 1,
-                "r2_score": r2,
-                "mse": mean_squared_error(y_true, predictions),
-                "rmse": np.sqrt(mean_squared_error(y_true, predictions))
-            }
-            with open(metrics_path, 'w') as f:
-                json.dump(metrics_data, f, indent=4)
-
-            print(f'\n[Mô hình đã lưu], R²: {r2:.4f}, File: {model_path}')
-
-
-def load_best_metrics():
-    if os.path.exists(metrics_path):
-        with open(metrics_path, 'r') as f:
-            metrics = json.load(f)
-        print(f"[Load model seccussfully]")
-        print(f"Epoch: {metrics['epoch']}")
-        print(f"R²: {metrics['r2_score']:.2f}")
-        print(f"MSE: {metrics['mse']:.2f}")
-        print(f"RMSE: {metrics['rmse']:.2f}")
-        return metrics
-    else:
-        print("[Not found model]")
-        return None
-
-
-def plot(test_data, y_test, best_predictions):
-    if best_predictions is None:
-        print('No model to plot')
-        return
-    mse = mean_squared_error(y_test, best_predictions)
-    rmse = np.sqrt(mse)
-    r2 = r2_score(y_test, best_predictions)
-
-    print(f'MSE: {mse}')
-    print(f'RMSE: {rmse}')
-    print(f'R²: {r2}')
-
-    plt.figure(figsize=(20, 10))
-
-    if len(test_data['timestamp']) > len(y_test):
-        test_data = test_data.iloc[:len(y_test)]
-
-    plt.plot(test_data['timestamp'], y_test, label='Real Traffic Count', color='red')
-    plt.plot(test_data['timestamp'], best_predictions, label='Predicted Traffic Count', color='blue')
-    plt.xlabel('Time')
-    plt.ylabel('Traffic Count')
-    plt.title('Traffic Prediction')
+    plt.title("Training Losses")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
     plt.legend()
-    plt.savefig('../res/GAN/GAN.png')
-    plt.close()
+    plt.grid(True)
 
+    # Save and show plot
+    plt.savefig(args.plot_path)
+    plt.show()
 
-def read_data():
-    data = pd.read_csv(file_path)
-    data['timestamp'] = pd.to_datetime(data['timestamp'])
-    data.sort_values('timestamp', inplace=True)
+def display_predictions(generator, scaler, args):
+    noise = np.random.normal(0, 1, (10, 100))  # Tạo 10 sample giả
+    generated_traffic = generator.predict(noise, verbose=0)  # Dự đoán
+    generated_traffic = scaler.inverse_transform(generated_traffic.reshape(-1, args.time_step))  # Đưa về giá trị gốc
 
-    train_data = data[data['timestamp'] < '2015-12-27']
-    test_data = data[(data['timestamp'] >= '2015-12-27') & (data['timestamp'] <= '2015-12-30')]
+    plt.figure(figsize=(12, 6))
+    for i, traffic in enumerate(generated_traffic):
+        plt.plot(traffic, label=f"Generated {i+1}")
+    plt.title("Generated Traffic Predictions")
+    plt.xlabel("Time Step")
+    plt.ylabel("Traffic Count")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("../res/GAN/generated_predictions.png")
+    plt.show()
 
-    train_traffic = train_data['hourly_traffic_count'].values.reshape(-1, 1)
-    test_traffic = test_data['hourly_traffic_count'].values.reshape(-1, 1)
+def train(args):
+    latent_dim = 100
+    train_data, test_data, scaler = read_data(args.file_path)
+    x_train, y_train = create_dataset(train_data['scaled_count'].values, args.time_step)
+    x_test, y_test = create_dataset(test_data['scaled_count'].values, args.time_step)
 
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    train_scaled = scaler.fit_transform(train_traffic)
-    test_scaled = scaler.transform(test_traffic)
-
-    return test_data, train_scaled, test_scaled, scaler
-
-
-def create_dataset(dataset, time_step=1):
-    X, y = [], []
-    for i in range(len(dataset) - time_step):
-        a = dataset[i:(i + time_step), 0]
-        X.append(a)
-        y.append(dataset[i + time_step, 0])
-    return np.array(X), np.array(y)
-
-
-def build_generator():
-    model = Sequential()
-    model.add(Dense(256, input_dim=100))
-    model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.2))
-    model.add(Dense(512))
-    model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.2))
-    model.add(Dense(1024))
-    model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.2))
-    model.add(Dense(time_step, activation='sigmoid'))
-    return model
-
-
-def build_discriminator():
-    model = Sequential()
-    model.add(Input(shape=(time_step, 1)))
-    model.add(Flatten())
-    model.add(Dense(512))
-    model.add(LeakyReLU(alpha=0.2))
-    model.add(Dropout(0.3))
-    model.add(Dense(256))
-    model.add(LeakyReLU(alpha=0.2))
-    model.add(Dropout(0.3))
-    model.add(Dense(1, activation='sigmoid'))
-    return model
-
-
-def train_gan():
-    test_data, train_scaled, test_scaled, scaler = read_data()
-    x_train, y_train = create_dataset(train_scaled, time_step)
-    x_test, y_test = create_dataset(test_scaled, time_step)
-
-    generator = build_generator()
-    discriminator = build_discriminator()
-
-    discriminator.compile(optimizer=optimizer, loss='binary_crossentropy', metrics=['accuracy'])
+    generator = build_generator(latent_dim, args.time_step)
+    discriminator = build_discriminator(args.time_step)
+    discriminator.compile(optimizer=Adam(learning_rate=0.0002, beta_1=0.5), loss='binary_crossentropy',
+                          metrics=['accuracy'])
 
     discriminator.trainable = False
     gan_input = Input(shape=(latent_dim,))
     x = generator(gan_input)
     gan_output = discriminator(x)
     gan = Model(gan_input, gan_output)
-    gan.compile(optimizer=optimizer, loss='binary_crossentropy')
+    gan.compile(optimizer=Adam(learning_rate=0.0002, beta_1=0.5), loss='binary_crossentropy')
 
-    best_metrics = load_best_metrics()
-    save_callback = CustomSaveCallback(x_test, y_test, scaler, best_metrics['r2_score'] if best_metrics else -np.inf,
-                                       gan)  # Chuyển gan vào callback
+    d_losses, g_losses = [], []
 
-    for epoch in range(train_epoch):
-        noise = np.random.normal(0, 1, (batch_size, latent_dim))
-        fake_traffic = generator.predict(noise)
-
-        real_traffic = x_train[np.random.randint(0, x_train.shape[0], batch_size)].reshape(batch_size, time_step, 1)
-        real_labels = np.ones((batch_size, 1))
-        fake_labels = np.zeros((batch_size, 1))
+    for epoch in range(args.train_epoch):
+        noise = np.random.normal(0, 1, (args.batch_size, latent_dim))
+        fake_traffic = generator.predict(noise, verbose=0)
+        real_traffic = x_train[np.random.randint(0, x_train.shape[0], args.batch_size)].reshape(args.batch_size, args.time_step, 1)
+        real_labels = np.ones((args.batch_size, 1))
+        fake_labels = np.zeros((args.batch_size, 1))
 
         d_loss_real = discriminator.train_on_batch(real_traffic, real_labels)
         d_loss_fake = discriminator.train_on_batch(fake_traffic, fake_labels)
+        d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
+        d_losses.append(d_loss)
 
-        noise = np.random.normal(0, 1, (batch_size, latent_dim))
-        valid_y = np.ones((batch_size, 1))
+        noise = np.random.normal(0, 1, (args.batch_size, latent_dim))
+        valid_y = np.ones((args.batch_size, 1))
         g_loss = gan.train_on_batch(noise, valid_y)
+        g_losses.append(g_loss)
 
         if epoch % 10 == 0:
-            print(
-                f"{epoch} [D loss real: {d_loss_real[0]}, acc.: {d_loss_real[1]}] [D loss fake: {d_loss_fake[0]}, acc.: {d_loss_fake[1]}] [G loss: {g_loss}]")
+            print(f"{epoch} [D loss: {d_loss[0]}, acc.: {100 * d_loss[1]}%] [G loss: {g_loss}]")
 
-        save_callback.on_epoch_end(epoch)
-
-    return test_data, save_callback.scaler.inverse_transform(
-        save_callback.y_test.reshape(-1, 1)), save_callback.best_predictions
-
-
+    generator.save(args.model_path)
+    print(f"Final D loss: {d_losses[-1][0]}, acc.: {100 * d_losses[-1][1]}%")
+    print(f"Final G loss: {g_losses[-1]}")
+    return d_losses, g_losses, scaler
 
 if __name__ == '__main__':
-    test_data, y_test, test_predict = train_gan()
-    plot(test_data, y_test, test_predict)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--file_path', type=str, default="../resource/train27303.csv")
+    parser.add_argument('--metrics_path', type=str, default="../res/GAN/gan_metrics.json")
+    parser.add_argument('--plot_path', type=str, default="../res/GAN/gan_plot.png")
+    parser.add_argument('--model_path', type=str, default="../res/GAN/gan_model.h5")
+    parser.add_argument('--time_step', type=int, default=64)
+    parser.add_argument('--train_epoch', type=int, default=200)
+    parser.add_argument('--batch_size', type=int, default=64)
+
+    args = parser.parse_args()
+    d_losses, g_losses, scaler = train(args)
+    plot_results(d_losses, g_losses, args)
+    generator = tf.keras.models.load_model(args.model_path)
+    display_predictions(generator, scaler, args)
