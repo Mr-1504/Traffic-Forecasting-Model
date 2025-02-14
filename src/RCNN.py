@@ -17,34 +17,24 @@ def train(args):
     x_test = x_test.reshape(x_test.shape[0], x_test.shape[1], 1)
 
     model = Sequential()
-    # model.add(Conv1D(filters=32, kernel_size=2, activation='relu', input_shape=(args.time_step, 1)))
-    # model.add(MaxPooling1D(pool_size=2))
-    # model.add(Conv1D(filters=64, kernel_size=2, activation='relu'))
-    # model.add(MaxPooling1D(pool_size=2))
-    # model.add(Conv1D(filters=128, kernel_size=2, activation='relu'))
-    # model.add(MaxPooling1D(pool_size=2))
-    # model.add(Conv1D(filters=512, kernel_size=2, activation='relu'))
-    # model.add(MaxPooling1D(pool_size=2))
-
-    model.add(Conv1D(filters=64, kernel_size=3, activation='relu', input_shape=(args.time_step, 1)))
+    model.add(Conv1D(filters=32, kernel_size=2, activation='relu', input_shape=(args.time_step, 1)))
     model.add(MaxPooling1D(pool_size=2))
-    model.add(Conv1D(filters=128, kernel_size=3, activation='relu'))
+    model.add(Conv1D(filters=64, kernel_size=2, activation='relu'))
+    model.add(MaxPooling1D(pool_size=2))
+    model.add(Conv1D(filters=128, kernel_size=2, activation='relu'))
+    model.add(MaxPooling1D(pool_size=2))
+    model.add(Conv1D(filters=512, kernel_size=2, activation='relu'))
     model.add(MaxPooling1D(pool_size=2))
 
-    # model.add(LSTM(512, return_sequences=True, dropout=0.2, recurrent_dropout=0.2))
-    # model.add(LSTM(512, return_sequences=False, dropout=0.2, recurrent_dropout=0.2))
-
-    model.add(LSTM(256, return_sequences=True, dropout=0.1, recurrent_dropout=0.1))
-    model.add(LSTM(128, return_sequences=False, dropout=0.1, recurrent_dropout=0.1))
+    model.add(LSTM(512, return_sequences=True, dropout=0.2, recurrent_dropout=0.2))
+    model.add(LSTM(512, return_sequences=False, dropout=0.2, recurrent_dropout=0.2))
 
     model.add(Dense(32, activation='relu'))
     model.add(Dense(1))
 
     model.compile(optimizer=Adam(learning_rate=1e-4), loss='mae')
 
-    best_metrics = load_best_metrics(args.metrics_path)
-    save_callback = CustomSaveCallback(x_test, y_test, scaler, best_metrics['r2_score'] if best_metrics else -np.inf,
-                                       args)
+    save_callback = CustomSaveCallback(x_test, y_test, scaler, args)
     model.fit(
         x_train,
         y_train,

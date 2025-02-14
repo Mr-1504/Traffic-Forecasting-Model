@@ -16,8 +16,7 @@ def train(args):
     x_test = x_test.reshape(x_test.shape[0], x_test.shape[1], 1)
 
     best_metrics = load_best_metrics(args.metrics_path)
-    callback = CustomSaveCallback(x_test, y_test, scaler,
-                                  best_metrics['r2_score'] if best_metrics else -np.inf, args)
+    callback = CustomSaveCallback(x_test, y_test, scaler, args)
 
     model = Sequential([
         LSTM(128, return_sequences=True, input_shape=(args.time_step, 1)),

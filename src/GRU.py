@@ -27,9 +27,7 @@ def train(args):
     model.add(Dense(1))
     model.compile(optimizer=Adam(learning_rate=1e-4), loss='mae')
 
-    best_metrics = load_best_metrics(args.metrics_path)
-    save_callback = CustomSaveCallback(x_test, y_test, scaler, best_metrics['r2_score'] if best_metrics else -np.inf,
-                                       args)
+    save_callback = CustomSaveCallback(x_test, y_test, scaler, args)
     model.fit(
         x_train,
         y_train,
@@ -49,7 +47,7 @@ if __name__ == '__main__':
     parser.add_argument('--plot_path', type=str, default="../res/GRU/gru_plot.png")
     parser.add_argument('--model_path', type=str, default="../res/GRU/gru_model.h5")
     parser.add_argument('--checkpoint_path', type=str, default="../res/GRU/gru_checkpoint.keras")
-    parser.add_argument('--time_step', type=int, default=12)
+    parser.add_argument('--time_step', type=int, default=24)
     parser.add_argument('--train_epoch', type=int, default=200)
     parser.add_argument('--batch_size', type=int, default=64)
 
